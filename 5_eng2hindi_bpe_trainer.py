@@ -38,10 +38,10 @@ class TransformerConfig:
    TGT_VOCAB_SIZE: int = 30_000                      # target vocabulary size
    SRC_MAX_LENGTH: int = 1024                         # max sequence length source lang
    TGT_MAX_LENGTH: int = 1024                         # max sequence length target lang
-   D_MODEL: int = 128                                # embedding dimension
+   D_MODEL: int = 256                                # embedding dimension
    N_HEADS: int = 4                                  # number of heads in attention
    N_LAYERS: int = 6                                 # number of transformer blocks
-   D_FF: int = 128 * 4                               # dimension of feedforward (4x of embedding dims)
+   D_FF: int = 256 * 4                               # dimension of feedforward (4x of embedding dims)
    MAX_SEQ_LEN: int = 256
    DROPOUT: float = 0.1
    BATCH_SIZE: int = 64
@@ -189,7 +189,8 @@ wandbrun = wandb.init(entity=wandb_entity,
                         )
 
 # setup logging
-file = f"logs/training_log_transformer_mt_{wandb_experiment}{datetime.datetime.now().strftime("%Y-%m-%d")}.txt"
+os.makedirs("logs", exist_ok=True)
+file = f"""logs/training_log_transformer_mt_{wandb_experiment}{datetime.datetime.now().strftime("%Y-%m-%d")}.txt"""
 if os.path.isfile(file):
     os.remove(file)
 
