@@ -35,7 +35,7 @@ class TransformerConfig:
    N_LAYERS: int = 6                                 # number of transformer blocks
    D_FF: int = 128 * 4                               # dimension of feedforward (4x of embedding dims)
    DROPOUT: float = 0.1
-   BATCH_SIZE: int = 16
+   BATCH_SIZE: int = 32
    EVAL_STEPS: int = 250
    EPOCHS: int = 10
 
