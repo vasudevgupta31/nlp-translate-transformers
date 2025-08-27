@@ -41,7 +41,6 @@ class TransformerConfig:
    EVAL_STEPS: int = 100
    EPOCHS: int = 10
 
-
 config = TransformerConfig()
 
 en_texts = []

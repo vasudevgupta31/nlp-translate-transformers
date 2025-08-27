@@ -22,21 +22,20 @@ from src.scores import calculate_translation_metrics
 # wandb params
 wandb_entity        = "vasudev-gupta-decision-tree-analytics-services"
 wandb_project       = "iitk-nlp-capstone"
-wandb_experiment    = "exp6-eng-bengali-transformer-built-in-bpe-30k-1024"
+wandb_experiment    = "exp7-eng-bengali-transformer-built-in-bpe-30k"
 
 @dataclass
 class TransformerConfig:
-   SRC_VOCAB_SIZE: int = 20_000                      # source vocabulary size
-   TGT_VOCAB_SIZE: int = 20_000                      # target vocabulary size
+   SRC_VOCAB_SIZE: int = 30_000                      # source vocabulary size
+   TGT_VOCAB_SIZE: int = 30_000                      # target vocabulary size
    SRC_MAX_LENGTH: int = 256                         # max sequence length source lang
    TGT_MAX_LENGTH: int = 256                         # max sequence length target lang
-   D_MODEL: int = 256                                # embedding dimension
-   N_HEADS: int = 8                                  # number of heads in attention
-   N_LAYERS: int = 8                                 # number of transforme~r blocks
-   D_FF: int = 256 * 4                               # dimension of feedforward (4x of embedding dims)
-   MAX_SEQ_LEN: int = 256
+   D_MODEL: int = 128                                # embedding dimension
+   N_HEADS: int = 4                                  # number of heads in attention
+   N_LAYERS: int = 6                                 # number of transformer blocks
+   D_FF: int = 128 * 4                               # dimension of feedforward (4x of embedding dims)
    DROPOUT: float = 0.1
-   BATCH_SIZE: int = 32
+   BATCH_SIZE: int = 16
    EVAL_STEPS: int = 250
    EPOCHS: int = 10
 
@@ -59,11 +58,11 @@ train_indices, val_indices = train_test_split(range(len(en_texts)),
 # bpe tokenizers trained in 4_train_bpe.py
 # eng tokenizer
 eng_tokenizer = MyBPETokenizer()
-eng_tokenizer= eng_tokenizer.load_tokenizer("tokenizers/english_shared_bpe_20000_256.pkl")
+eng_tokenizer= eng_tokenizer.load_tokenizer("tokenizers/english_shared_bpe_30000.pkl")
 
 # indic tokenizer
 indic_tokenizer = IndicBPETokenizer()
-indic_tokenizer_tokenizer= indic_tokenizer.load_tokenizer("tokenizers/bengali_bpe_20000_256.pkl")
+indic_tokenizer_tokenizer= indic_tokenizer.load_tokenizer("tokenizers/bengali_bpe_30000.pkl")
 
 en_sequences = eng_tokenizer.texts_to_sequences(en_texts)
 be_sequences = indic_tokenizer.texts_to_sequences(be_texts)
@@ -130,7 +129,7 @@ min_lr        = max_lr * 0.1                # Final learning rate at the end of 
 warmup_steps  = int(MAX_STEPS * 0.035)      # Number of steps for linear LR warmup (3.5% of total training), gradually increases LR from 0 to max_lr
 
 # Optimizer
-optimizer = torch.optim.AdamW(transformer_model.parameters(), lr=max_lr)
+optimizer = torch.optim.AdamW(transformer_model.parameters(), lr=max_lr, weight_decay=0.01, betas=(0.9, 0.98), eps=1e-9)
 total_params = sum(p.numel() for p in transformer_model.parameters())
 print(f"transformer has {total_params:,} parameters")
 
@@ -178,7 +177,8 @@ wandbrun = wandb.init(entity=wandb_entity,
                         )
 
 # setup logging
-file = f"logs/training_log_transformer_mt_{wandb_experiment}{datetime.datetime.now().strftime("%Y-%m-%d")}.txt"
+os.makedirs("logs", exist_ok=True)
+file = f"""logs/training_log_transformer_mt_{wandb_experiment}{datetime.datetime.now().strftime("%Y-%m-%d")}.txt"""
 if os.path.isfile(file):
     os.remove(file)
 
@@ -275,16 +275,16 @@ for step in range(1, MAX_STEPS + 1):
         val_lossi.append((step, avg_val_loss))
         
         # calculate translatoin metrics
-        metrics = calculate_translation_metrics(transformer_model, 
-                                                eng_tokenizer, 
-                                                indic_tokenizer,
-                                                en_val_texts, 
-                                                be_val_texts, 
-                                                device=device, 
-                                                num_samples=val_steps)
-        avg_val_chrf, avg_val_bleu = metrics['chrf'], metrics['bleu']
+        # metrics = calculate_translation_metrics(transformer_model, 
+        #                                         eng_tokenizer, 
+        #                                         indic_tokenizer,
+        #                                         en_val_texts, 
+        #                                         be_val_texts, 
+        #                                         device=device, 
+        #                                         num_samples=val_steps)
+        # avg_val_chrf, avg_val_bleu = metrics['chrf'], metrics['bleu']
 
-        msg = (f"{step:5d} | {training_epoch:5d} | {loss.item():11.4f} | {avg_val_loss:9.4f} | {avg_val_chrf: 8.4f} | {avg_val_bleu: 8.4f}")
+        msg = (f"{step:5d} | {training_epoch:5d} | {loss.item():11.4f} | {avg_val_loss:9.4f}")
     else:
         msg = f"{step:5d}  | {training_epoch:5d}  | {loss.item():11.4f}  |    ----"
 
@@ -301,8 +301,8 @@ for step in range(1, MAX_STEPS + 1):
             'val_lossi': val_lossi,
 
             # tokenizer path for inference
-            'eng_tokenizer':   "tokenizers/english_shared_bpe_20000_256.pkl"  ,
-            'indic_tokenizer': "tokenizers/bengali_bpe_20000_256.pkl",
+            'eng_tokenizer':   "tokenizers/english_shared_bpe_30000.pkl"  ,
+            'indic_tokenizer': "tokenizers/bengali_bpe_30000.pkl",
             
             # MODEL metadata for reconstruction
             'model_config': {                                    

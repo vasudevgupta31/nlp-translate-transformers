@@ -101,9 +101,9 @@ def train_english_tokenizer(all_english_texts, vocab_size, max_length):
     # create and train the tokenizer
     eng_tokenizer = MyBPETokenizer(vocab_size=vocab_size, max_len=max_length)
     eng_vocab_size = eng_tokenizer.train_bpe(all_english_texts)
-    
+
     # save it 
-    eng_tokenizer_path = os.path.join("tokenizers", f"english_shared_bpe_{vocab_size}_{max_length}.pkl")
+    eng_tokenizer_path = os.path.join("tokenizers", f"english_shared_bpe_{vocab_size}.pkl")
     eng_tokenizer.save_tokenizer(eng_tokenizer_path)
     
     print(f"[English] done! got vocab size: {eng_vocab_size}")
@@ -118,7 +118,7 @@ def train_hindi_tokenizer(hi_texts, vocab_size, max_length):
     hi_vocab_size = hi_tokenizer.train_bpe(hi_texts)
     
     # save the trained tokenizer
-    hi_tokenizer_path = os.path.join("tokenizers", f"hindi_bpe_{vocab_size}_{max_length}.pkl")
+    hi_tokenizer_path = os.path.join("tokenizers", f"hindi_bpe_{vocab_size}.pkl")
     hi_tokenizer.save_tokenizer(hi_tokenizer_path)
     
     print(f"[Hindi] finished training! vocab size: {hi_vocab_size}")
@@ -133,7 +133,7 @@ def train_bengali_tokenizer(bn_texts, vocab_size, max_length):
     bn_vocab_size = bn_tokenizer.train_bpe(bn_texts)
 
     # save to disk
-    bn_tokenizer_path = os.path.join("tokenizers", f"bengali_bpe_{vocab_size}_{max_length}.pkl")
+    bn_tokenizer_path = os.path.join("tokenizers", f"bengali_bpe_{vocab_size}.pkl")
     bn_tokenizer.save_tokenizer(bn_tokenizer_path)
 
     print(f"[Bengali] training done! final vocab size: {bn_vocab_size}")

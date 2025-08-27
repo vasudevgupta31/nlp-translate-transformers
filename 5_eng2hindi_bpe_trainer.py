@@ -22,29 +22,23 @@ from src.components import TransformerMT  as selftx
 from src.torchlayers import TransformerMT as torchtx
 from src.scores import calculate_translation_metrics
 
-
-if torch.cuda.is_available():
-    torch.cuda.empty_cache()
-
-
 # wandb params
 wandb_entity        = "vasudev-gupta-decision-tree-analytics-services"
 wandb_project       = "iitk-nlp-capstone"
-wandb_experiment    = "exp6-eng-hindi-transformer-built-in-bpe-30k-1024"
+wandb_experiment    = "exp7-eng-hindi-transformer-built-in-bpe-30k"
 
 @dataclass
 class TransformerConfig:
    SRC_VOCAB_SIZE: int = 30_000                      # source vocabulary size
    TGT_VOCAB_SIZE: int = 30_000                      # target vocabulary size
-   SRC_MAX_LENGTH: int = 1024                         # max sequence length source lang
-   TGT_MAX_LENGTH: int = 1024                         # max sequence length target lang
-   D_MODEL: int = 256                                # embedding dimension
+   SRC_MAX_LENGTH: int = 256                         # max sequence length source lang
+   TGT_MAX_LENGTH: int = 256                         # max sequence length target lang
+   D_MODEL: int = 128                                # embedding dimension
    N_HEADS: int = 4                                  # number of heads in attention
    N_LAYERS: int = 6                                 # number of transformer blocks
-   D_FF: int = 256 * 4                               # dimension of feedforward (4x of embedding dims)
-   MAX_SEQ_LEN: int = 256
+   D_FF: int = 128 * 4                               # dimension of feedforward (4x of embedding dims)
    DROPOUT: float = 0.1
-   BATCH_SIZE: int = 64
+   BATCH_SIZE: int = 32
    EVAL_STEPS: int = 250
    EPOCHS: int = 10
 
@@ -68,12 +62,12 @@ train_indices, val_indices = train_test_split(range(len(en_texts)),
 
 # bpe tokenizers trained in 4_train_bpe.py
 # eng tokenizer
-eng_tokenizer = MyBPETokenizer()
-eng_tokenizer= eng_tokenizer.load_tokenizer("tokenizers/english_shared_bpe_30000_1024.pkl")
+eng_tokenizer = MyBPETokenizer(max_len=config.SRC_MAX_LENGTH)
+eng_tokenizer= eng_tokenizer.load_tokenizer("tokenizers/english_shared_bpe_30000.pkl")
 
 # indic tokenizer
-hi_tokenizer = IndicBPETokenizer()
-hi_tokenizer= hi_tokenizer.load_tokenizer("tokenizers/hindi_bpe_30000_1024.pkl")
+hi_tokenizer = IndicBPETokenizer(max_len=config.TGT_MAX_LENGTH)
+hi_tokenizer= hi_tokenizer.load_tokenizer("tokenizers/hindi_bpe_30000.pkl")
 
 en_sequences = eng_tokenizer.texts_to_sequences(en_texts)
 hi_sequences = hi_tokenizer.texts_to_sequences(hi_texts)
@@ -141,7 +135,7 @@ min_lr        = max_lr * 0.1                # Final learning rate at the end of 
 warmup_steps  = int(MAX_STEPS * 0.035)      # Number of steps for linear LR warmup (3.5% of total training), gradually increases LR from 0 to max_lr
 
 # Optimizer
-optimizer = torch.optim.AdamW(transformer_model.parameters(), lr=max_lr)
+optimizer = torch.optim.AdamW(transformer_model.parameters(), lr=max_lr, weight_decay=0.01, betas=(0.9, 0.98), eps=1e-9)
 total_params = sum(p.numel() for p in transformer_model.parameters())
 print(f"transformer has {total_params:,} parameters")
 
@@ -211,8 +205,8 @@ logfile.write("EPOCHS        : {}\n".format(config.EPOCHS))
 logfile.write(f"Training on {device}...\n")
 logfile.write("\n=======================\n\n")
 
-print("Step  |  Epoch |  Train Loss  |  Val Loss  |  Val Bleu  |  Val CHRF  ")
-logfile.write("Step  |  Epoch |  Train Loss  |  Val Loss  |  Val Bleu  |  Val CHRF  \n")
+print("Step  |  Epoch |  Train Loss  |  Val Loss")
+logfile.write("Step  |  Epoch |  Train Loss  |  Val Loss")
 logfile.write("-" * 70 + "\n")
 print("-" * 62)
 
@@ -248,9 +242,6 @@ for step in range(1, MAX_STEPS + 1):
 
     loss = loss_fn(outputs, tgt_target)
 
-    tgt_input.detach().to('cpu')
-    tgt_target.detach().to('cpu')
-
     # backward
     loss.backward()
     tr_lossi.append((step, loss.item()))
@@ -285,24 +276,21 @@ for step in range(1, MAX_STEPS + 1):
 
                 preds = out.argmax(1)
                 non_pad_mask = (yb_target != 0)
-                
-                xb.detach().to('cpu')
-                yb.detach().to('cpu')
 
         avg_val_loss = val_loss_sum / val_steps
         val_lossi.append((step, avg_val_loss))
 
         # calculate translatoin metrics
-        metrics = calculate_translation_metrics(transformer_model, 
-                                                eng_tokenizer, 
-                                                hi_tokenizer,
-                                                en_val_texts, 
-                                                hi_val_texts, 
-                                                device='cpu', 
-                                                num_samples=val_steps)
-        avg_val_chrf, avg_val_bleu = metrics['chrf'], metrics['bleu']
+        # metrics = calculate_translation_metrics(transformer_model, 
+        #                                         eng_tokenizer, 
+        #                                         hi_tokenizer,
+        #                                         en_val_texts, 
+        #                                         hi_val_texts, 
+        #                                         device='cpu', 
+        #                                         num_samples=val_steps)
+        # avg_val_chrf, avg_val_bleu = metrics['chrf'], metrics['bleu']
 
-        msg = (f"{step:5d} | {training_epoch:5d} | {loss.item():11.4f} | {avg_val_loss:9.4f} | {avg_val_chrf: 8.4f} | {avg_val_bleu: 8.4f}")
+        msg = (f"{step:5d} | {training_epoch:5d} | {loss.item():11.4f} | {avg_val_loss:9.4f}")
     else:
         msg = f"{step:5d}  | {training_epoch:5d}  | {loss.item():11.4f}  |    ----"
 
@@ -319,9 +307,9 @@ for step in range(1, MAX_STEPS + 1):
             'val_lossi': val_lossi,
 
             # tokenizer path for inference
-            'eng_tokenizer':   "tokenizers/english_shared_bpe_20000_256.pkl"  ,
-            'indic_tokenizer': "tokenizers/hindi_bpe_20000_256.pkl",
-            
+            'eng_tokenizer':   "tokenizers/english_shared_bpe_30000.pkl"  ,
+            'indic_tokenizer': "tokenizers/hindi_bpe_30000.pkl",
+
             # MODEL metadata for reconstruction
             'model_config': {                                    
                 'src_vocab_size': config.SRC_VOCAB_SIZE,
