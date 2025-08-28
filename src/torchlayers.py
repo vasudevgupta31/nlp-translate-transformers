@@ -121,12 +121,12 @@ class TransformerMT(nn.Module):
         with torch.no_grad():
             batch_size = src.size(0)
             device = src.device
-            
+
             # encode source
             src_key_padding_mask = self.create_padding_mask(src)
             src_emb = self.src_embedding(src) * math.sqrt(self.d_model)
             src_emb = src_emb + self.pos_encoding[:src_emb.size(1)].unsqueeze(0)
-            
+
             encoder_output = self.encoder(
                 src_emb, 
                 src_key_padding_mask=src_key_padding_mask
@@ -172,3 +172,92 @@ class TransformerMT(nn.Module):
                     break
             
             return generated[:, 1:]  # remove SOS token
+
+    def generatev2(self, 
+                   src, 
+                   max_length=50, 
+                   temperature=0.0, 
+                   min_length=20, 
+                   repetition_penalty=1.1, 
+                   length_penalty=0.8):
+
+        self.eval()
+        
+        with torch.no_grad():
+            batch_size = src.size(0)
+            device = src.device
+            
+            # encode source once
+            src_key_padding_mask = self.create_padding_mask(src)
+            src_emb = self.src_embedding(src) * math.sqrt(self.d_model)
+            src_emb = src_emb + self.pos_encoding[:src_emb.size(1)].unsqueeze(0)
+            
+            # forward through enc
+            encoder_output = self.encoder(src_emb,  src_key_padding_mask=src_key_padding_mask)
+            
+            # initialize output
+            generated = torch.full((batch_size, 1), 2, dtype=torch.long, device=device)
+            finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+
+            # track tokens for repetition penalty
+            vocab_size = self.output_projection.out_features
+            token_counts = torch.zeros(batch_size, vocab_size, device=device)
+
+            for step in range(max_length):
+                if finished.all():
+                    break
+
+                # create tgt embeddings and decode
+                tgt_emb = self.tgt_embedding(generated) * math.sqrt(self.d_model)
+                tgt_emb = tgt_emb + self.pos_encoding[:generated.size(1)].unsqueeze(0)
+                tgt_mask = self.create_causal_mask(generated.size(1), device)
+                
+                decoder_output = self.decoder(tgt_emb, 
+                                              encoder_output, 
+                                              tgt_mask=tgt_mask,
+                                              memory_key_padding_mask=src_key_padding_mask)
+                logits = self.output_projection(decoder_output[:, -1, :])
+
+                # apply repetition penalty
+                if repetition_penalty != 1.0:
+                    for i in range(batch_size):
+                        if not finished[i]:
+                            for token in generated[i]:
+                                if token_counts[i, token] > 0:
+                                    logits[i, token] /= repetition_penalty
+                
+                # prevent early EOS
+                if step < min_length:
+                    logits[:, 3] = -float('inf')
+                
+                # apply length penalty
+                if step > min_length and length_penalty != 1.0:
+                    logits[:, 3] += math.log(length_penalty)
+
+                # generate greedy token 
+                if temperature == 0.0:
+                    next_token = logits.argmax(dim=-1, keepdim=True)
+                else:
+                    # temp scaling
+                    sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                    cumulative_probs = torch.cumsum(torch.softmax(sorted_logits / temperature, dim=-1), dim=-1)
+                    
+                    # mantain 90% probability mass
+                    cutoff_mask = cumulative_probs > 0.9
+                    cutoff_mask[..., 0] = False  # at least one token
+
+                    sorted_logits[cutoff_mask] = -float('inf')
+                    logits = torch.gather(sorted_logits, -1, sorted_indices.argsort(-1))
+                    
+                    probs = torch.softmax(logits / temperature, dim=-1)
+                    next_token = torch.multinomial(probs, 1)
+                
+                # update token counts
+                for i in range(batch_size):
+                    if not finished[i]:
+                        token_counts[i, next_token[i, 0]] += 1
+                
+                generated = torch.cat([generated, next_token], dim=1)
+                finished |= (next_token.squeeze(-1) == 3) & (step >= min_length)
+            
+            return generated[:, 1:]

@@ -16,7 +16,7 @@ indic_nlp_library/
 eval/
 logs/
 wandb/
-data/raw/
+data/raw/train_data1.json
 
 # Distribution / packaging
 .Python

@@ -1,0 +1,20 @@
+[project]
+name = "capstone"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "vasudevgupta31",email = "guptavasudelhi@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "wandb (>=0.21.1,<0.22.0)",
+    "scikit-learn (>=1.7.1,<2.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "sacrebleu (>=2.5.1,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

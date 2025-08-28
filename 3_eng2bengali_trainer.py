@@ -23,7 +23,7 @@ from src.scores import calculate_translation_metrics
 # wandb params
 wandb_entity        = "vasudev-gupta-decision-tree-analytics-services"
 wandb_project       = "iitk-nlp-capstone"
-wandb_experiment    = "exp5-eng-bengali-transformer-built-in"
+wandb_experiment    = "exp4.1-eng-bengali-transformer-built-in"
 
 @dataclass
 class TransformerConfig:
@@ -38,8 +38,8 @@ class TransformerConfig:
    MAX_SEQ_LEN: int = 256
    DROPOUT: float = 0.1
    BATCH_SIZE: int = 32
-   EVAL_STEPS: int = 100
-   EPOCHS: int = 10
+   EVAL_STEPS: int = 500
+   EPOCHS: int = 30
 
 config = TransformerConfig()
 
@@ -134,7 +134,7 @@ min_lr        = max_lr * 0.1                # Final learning rate at the end of 
 warmup_steps  = int(MAX_STEPS * 0.035)      # Number of steps for linear LR warmup (3.5% of total training), gradually increases LR from 0 to max_lr
 
 # Optimizer
-optimizer = torch.optim.AdamW(transformer_model.parameters(), lr=max_lr)
+optimizer = torch.optim.AdamW(transformer_model.parameters(), lr=max_lr, weight_decay=0.01, betas=(0.9, 0.98), eps=1e-9)
 total_params = sum(p.numel() for p in transformer_model.parameters())
 print(f"transformer has {total_params:,} parameters")
 
@@ -214,6 +214,9 @@ checkpoint_path = os.path.join("checkpoints", "eng_bengali", wandb_experiment)
 os.makedirs(checkpoint_path, exist_ok=True)
 tr_lossi, val_lossi = [], []
 avg_val_loss = None
+avg_val_loss = None
+avg_val_bleu = None
+avg_val_chrf = None
 
 for step in range(1, MAX_STEPS + 1):
 
@@ -277,21 +280,21 @@ for step in range(1, MAX_STEPS + 1):
         val_lossi.append((step, avg_val_loss))
         
         # calculate translatoin metrics
-        metrics = calculate_translation_metrics(transformer_model, 
-                                                eng_tokenizer, 
-                                                indic_tokenizer,
-                                                en_val_texts, 
-                                                be_val_texts, 
-                                                device=device, 
-                                                num_samples=val_steps)
-        avg_val_chrf, avg_val_bleu = metrics['chrf'], metrics['bleu']
+        # metrics = calculate_translation_metrics(transformer_model, 
+        #                                         eng_tokenizer, 
+        #                                         indic_tokenizer,
+        #                                         en_val_texts, 
+        #                                         be_val_texts, 
+        #                                         device=device, 
+        #                                         num_samples=val_steps)
+        # avg_val_chrf, avg_val_bleu = metrics['chrf'], metrics['bleu']
 
-        msg = (f"{step:5d} | {training_epoch:5d} | {loss.item():11.4f} | {avg_val_loss:9.4f} | {avg_val_chrf: 8.4f} | {avg_val_bleu: 8.4f}")
+        msg = (f"{step:5d} | {training_epoch:5d} | {loss.item():11.4f} | {avg_val_loss:9.4f}")
     else:
         msg = f"{step:5d}  | {training_epoch:5d}  | {loss.item():11.4f}  |    ----"
 
     # save checkpoint every 500 steps
-    if step % 500 == 0:
+    if step % 1000 == 0:
         checkpoint = {
             'step': step,
             'epoch': training_epoch,
@@ -331,10 +334,13 @@ for step in range(1, MAX_STEPS + 1):
             }
         }
 
-        checkpoint_file = os.path.join(checkpoint_path, f"tx_epoch_{training_epoch}_step_{step}.pt")
-        torch.save(checkpoint, checkpoint_file)
-        print(f"saved checkpoint at step {step}")
-        logfile.write(f"saved checkpoint at step {step}\n")
+        try:
+            checkpoint_file = os.path.join(checkpoint_path, f"tx_epoch_{training_epoch}_step_{step}.pt")
+            torch.save(checkpoint, checkpoint_file)
+            print(f"saved checkpoint at step {step}")
+            logfile.write(f"saved checkpoint at step {step}\n")
+        except Exception as e:
+            print("Exception in saving checkpoint", e)
 
     # wandb logging
     wandbrun.log({"step": step, 

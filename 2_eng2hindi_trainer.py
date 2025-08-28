@@ -27,7 +27,7 @@ from src.scores import calculate_translation_metrics
 # wandb params
 wandb_entity        = "vasudev-gupta-decision-tree-analytics-services"
 wandb_project       = "iitk-nlp-capstone"
-wandb_experiment    = "exp5-eng-hindi-transformer-built-in"
+wandb_experiment    = "exp4.1-eng-hindi-transformer-built-in"
 
 @dataclass
 class TransformerConfig:
@@ -36,14 +36,14 @@ class TransformerConfig:
    SRC_MAX_LENGTH: int = 256                         # max sequence length source lang
    TGT_MAX_LENGTH: int = 256                         # max sequence length target lang
    D_MODEL: int = 128                                # embedding dimension
-   N_HEADS: int = 4                                  # number of heads in attention
+   N_HEADS: int = 8                                  # number of heads in attention
    N_LAYERS: int = 6                                 # number of transformer blocks
    D_FF: int = 128 * 4                               # dimension of feedforward (4x of embedding dims)
    MAX_SEQ_LEN: int = 256
    DROPOUT: float = 0.1
    BATCH_SIZE: int = 32
    EVAL_STEPS: int = 100
-   EPOCHS: int = 10
+   EPOCHS: int = 30
 
 config = TransformerConfig()
 
